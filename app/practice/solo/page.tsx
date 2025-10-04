@@ -60,9 +60,11 @@ const [sessionScores, setSessionScores] = useState<{
   gesture_score: number;
   speaking_score: number;
 } | null>(null)
+// ...existing code...
   const videoRef = useRef<HTMLVideoElement>(null)
-  const timerRef = useRef<NodeJS.Timeout>()
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
+// ...existing code...
   const topics = [
     "The impact of social media on modern communication",
     "Why learning a new language benefits your career",
@@ -187,6 +189,7 @@ useEffect(() => {
   return () => {
     if (timerRef.current) {
       clearTimeout(timerRef.current)
+      timerRef.current = null;
     }
   }
 }, [])
@@ -966,83 +969,208 @@ if (currentStep === "speaking") {
                                 return Date.now().toString() + Math.random().toString(36).substr(2, 9);
                             }
 
+                            // ...existing code...
                             function startRecognition() {
-                                if ('webkitSpeechRecognition' in window) {
-                                    recognition = new webkitSpeechRecognition();
-                                    recognition.continuous = true;
-                                    recognition.interimResults = false;
+                                if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+                                    status.innerText = 'Speech recognition not supported. Use Chrome or Edge.';
+                                    return;
+                                }
 
-                                    recognition.onstart = () => {
-                                        status.innerText = 'Speech recognition is on. Speak into the microphone.';
-                                    };
+                                // Stop any existing recognition first
+                                if (recognition) {
+                                    try {
+                                        recognition.stop();
+                                        recognition = null;
+                                    } catch (e) {
+                                        console.log('Error stopping existing recognition:', e);
+                                    }
+                                }
 
-                                    recognition.onresult = (event) => {
-                                        let transcript = event.results[event.resultIndex][0].transcript;
-                                        if (ws && ws.readyState === WebSocket.OPEN) {
-                                            ws.send(transcript);
+                                const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+                                recognition = new SpeechRecognition();
+                                recognition.continuous = true;
+                                recognition.interimResults = true;
+                                recognition.lang = 'en-US';
+                                recognition.maxAlternatives = 1;
+
+                                let isRestarting = false;
+
+                                recognition.onstart = () => {
+                                    console.log('Speech recognition started');
+                                    status.innerText = 'Speech recognition active. Speak naturally.';
+                                    isRestarting = false;
+                                };
+
+                                recognition.onresult = (event) => {
+                                    try {
+                                        let transcript = '';
+                                        let isFinal = false;
+                                        
+                                        for (let i = event.resultIndex; i < event.results.length; i++) {
+                                            const result = event.results[i];
+                                            transcript += result[0].transcript;
+                                            if (result.isFinal) {
+                                                isFinal = true;
+                                            }
                                         }
-                                    };
-
-                                    recognition.onerror = (event) => {
-                                        status.innerText = 'Speech recognition error: ' + event.error;
-                                    };
-
-                                    recognition.onend = () => {
-                                        if (ws && ws.readyState === WebSocket.OPEN) {
-                                            recognition.start(); // Restart recognition
+                                        
+                                        if (isFinal && transcript.trim()) {
+                                            currentTranscript = transcript.trim();
+                                            console.log('Final transcript:', currentTranscript);
+                                            
+                                            if (ws && ws.readyState === WebSocket.OPEN) {
+                                                ws.send(currentTranscript);
+                                            } else {
+                                                status.innerText = 'You said: ' + currentTranscript;
+                                            }
                                         }
-                                    };
+                                    } catch (error) {
+                                        console.error('Speech recognition result error:', error);
+                                    }
+                                };
 
+                                recognition.onerror = (event) => {
+                                    console.error('Speech recognition error:', event.error);
+                                    
+                                    switch(event.error) {
+                                        case 'not-allowed':
+                                            status.innerText = 'Microphone access denied. Please refresh and allow permissions.';
+                                            break;
+                                        case 'network':
+                                            status.innerText = 'Network error. Check your connection.';
+                                            break;
+                                        case 'no-speech':
+                                            console.log('No speech detected, will restart...');
+                                            // Don't restart immediately, let onend handle it
+                                            break;
+                                        case 'aborted':
+                                            console.log('Speech recognition aborted');
+                                            return;
+                                        case 'audio-capture':
+                                            status.innerText = 'Microphone not found. Please check your microphone.';
+                                            break;
+                                        default:
+                                            status.innerText = 'Speech recognition error: ' + event.error;
+                                    }
+                                };
+
+                                recognition.onend = () => {
+                                    console.log('Speech recognition ended');
+                                    
+                                    // Only restart if websocket is still open and we're not already restarting
+                                    if (ws && ws.readyState === WebSocket.OPEN && !isRestarting) {
+                                        isRestarting = true;
+                                        setTimeout(() => {
+                                            if (isRestarting && ws && ws.readyState === WebSocket.OPEN) {
+                                                try {
+                                                    startRecognition(); // Call the function recursively
+                                                } catch (error) {
+                                                    console.log('Failed to restart recognition:', error);
+                                                    isRestarting = false;
+                                                }
+                                            }
+                                        }, 1000); // Longer delay to prevent rapid restarts
+                                    }
+                                };
+
+                                try {
                                     recognition.start();
-                                } else {
-                                    status.innerText = 'Your browser does not support Web Speech API.';
+                                } catch (error) {
+                                    console.error('Error starting recognition:', error);
+                                    status.innerText = 'Failed to start speech recognition. Please refresh.';
                                 }
                             }
-
-                            // Auto-start everything
-                            function autoStart() {
+// ...existing code...
+                            // ...existing code...
+                            async function autoStart() {
                                 sessionId = generateSessionId();
                                 sessionStartTime = Date.now();
                                 resetMediaPipeData();
                                 
+                                // Check browser support first
+                                if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+                                    status.innerText = 'Speech recognition not supported. Try Chrome or Edge.';
+                                    camera.start();
+                                    return;
+                                }
+
+                                // Check microphone permission first
+                                try {
+                                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                                    stream.getTracks().forEach(track => track.stop());
+                                    console.log('Microphone permission granted');
+                                } catch (error) {
+                                    status.innerText = 'Microphone access required. Please allow permissions and refresh.';
+                                    camera.start(); // Still start camera
+                                    return;
+                                }
+                                
+                                // Start camera first
                                 camera.start();
                                 
-                                // Connect to WebSocket
-                                ws = new WebSocket('ws://127.0.0.1:8000/ws/audio');
-                                
-                                let currentTranscript = '';
-                                
-                                ws.onopen = () => {
-                                    startRecognition();
-                                    status.innerText = 'Connected! Speak naturally.';
-                                };
-                                
-                                ws.onmessage = (event) => {
-                                    if (currentTranscript) {
-                                        textChunks.push({
-                                            text: currentTranscript,
-                                            response: event.data,
-                                            timestamp: Date.now()
-                                        });
-                                    }
-                                    status.innerText = event.data;
-                                };
-                                
-                                ws.onerror = (event) => {
-                                    console.error('WebSocket error:', event);
-                                    status.innerText = 'WebSocket connection failed. Ensure the backend server is running.';
-                                };
-                                
-                                if (recognition) {
-                                    recognition.onresult = (event) => {
-                                        let transcript = event.results[event.resultIndex][0].transcript;
-                                        currentTranscript = transcript;
-                                        if (ws && ws.readyState === WebSocket.OPEN) {
-                                            ws.send(transcript);
+                                // Try WebSocket connection with timeout
+                                try {
+                                    ws = new WebSocket('ws://127.0.0.1:8000/ws/audio');
+                                    
+                                    let currentTranscript = '';
+                                    let connectionTimeout = setTimeout(() => {
+                                        if (ws && ws.readyState === WebSocket.CONNECTING) {
+                                            ws.close();
+                                            console.warn('WebSocket connection timeout');
+                                            status.innerText = 'Backend unavailable. Continuing with video analysis only.';
+                                            startRecognition(); // Start recognition anyway
+                                        }
+                                    }, 5000);
+                                    
+                                    ws.onopen = () => {
+                                        clearTimeout(connectionTimeout);
+                                        console.log('WebSocket connected successfully');
+                                        startRecognition();
+                                        status.innerText = 'Connected! Speak naturally.';
+                                    };
+                                    
+                                    ws.onmessage = (event) => {
+                                        try {
+                                            if (currentTranscript) {
+                                                textChunks.push({
+                                                    text: currentTranscript,
+                                                    response: event.data,
+                                                    timestamp: Date.now()
+                                                });
+                                            }
+                                            status.innerText = event.data;
+                                        } catch (error) {
+                                            console.error('WebSocket message error:', error);
                                         }
                                     };
+                                    
+                                    ws.onerror = (event) => {
+                                        clearTimeout(connectionTimeout);
+                                        console.error('WebSocket error:', event);
+                                        status.innerText = 'Backend connection failed. Continuing with video analysis only.';
+                                        startRecognition(); // Start recognition anyway
+                                    };
+
+                                    ws.onclose = (event) => {
+                                        clearTimeout(connectionTimeout);
+                                        console.log('WebSocket closed:', event.code, event.reason);
+                                        if (recognition) {
+                                            try {
+                                                recognition.stop();
+                                                recognition = null;
+                                            } catch (e) {
+                                                console.log('Error stopping recognition on close:', e);
+                                            }
+                                        }
+                                    };
+                                    
+                                } catch (error) {
+                                    console.warn('WebSocket creation failed:', error);
+                                    status.innerText = 'Backend unavailable. Continuing with video analysis only.';
+                                    startRecognition(); // Start recognition anyway
                                 }
                             }
+// ...existing code...
                             window.addEventListener('message', (event) => {
                               if (event.data.action === 'getSessionData') {
                                 const sessionDuration = (Date.now() - sessionStartTime) / 1000;

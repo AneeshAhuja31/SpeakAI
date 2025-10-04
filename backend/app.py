@@ -12,7 +12,7 @@ import json
 import uuid
 from typing import Dict, List,Optional
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(override=True)
 API_KEY = os.getenv("GOOGLE_API")
 
 base_prompt = """

@@ -501,12 +501,12 @@ const generateSpeakerReport = async (speakerId: string, roomId: string) => {
               
               setRoom(message.room)
               setSessionPhase("preparation")
-              setPreparationTime(60)
+              setPreparationTime(10)
               generateTopic()
               
               // FIXED: Only current speaker sends preparation_complete
               console.log("📍 Starting 60-second preparation countdown")
-              let countdown = 60
+              let countdown = 10
               setPreparationTime(countdown)
               
               const timerInterval = setInterval(() => {

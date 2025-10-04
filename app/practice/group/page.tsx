@@ -34,7 +34,7 @@ export default function GroupPracticePage() {
     roomName: "",
     maxParticipants: 6,
     topicCategory: "Everyday Conversations",
-    timePerSpeaker: 2,
+    timePerSpeaker: 1,
     privacy: "public",
     description: "",
   })
@@ -438,6 +438,7 @@ export default function GroupPracticePage() {
                         value={formData.timePerSpeaker}
                         onChange={(e) => setFormData({ ...formData, timePerSpeaker: Number.parseInt(e.target.value) })}
                       >
+                        <option value="0.33">20 seconds</option>
                         <option value="2">2 minutes</option>
                         <option value="3">3 minutes</option>
                         <option value="4">4 minutes</option>
