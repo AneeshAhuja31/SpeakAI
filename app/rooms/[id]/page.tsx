@@ -783,6 +783,24 @@ const generateSpeakerReport = async (speakerId: string, roomId: string) => {
     }
   }, [id, currentUser.id])
 
+  // ✅ AUDIO FIX: Add click listener to enable audio on first user interaction
+  useEffect(() => {
+    const handleFirstUserInteraction = () => {
+      enableAudioForAllVideos()
+      // Remove listener after first interaction
+      document.removeEventListener('click', handleFirstUserInteraction)
+      document.removeEventListener('keydown', handleFirstUserInteraction)
+    }
+
+    document.addEventListener('click', handleFirstUserInteraction)
+    document.addEventListener('keydown', handleFirstUserInteraction)
+
+    return () => {
+      document.removeEventListener('click', handleFirstUserInteraction)
+      document.removeEventListener('keydown', handleFirstUserInteraction)
+    }
+  }, [])
+
   useEffect(() => {
   let interval: NodeJS.Timeout | null = null
   // Only poll if I'm the current speaker and in speaking phase
@@ -821,8 +839,10 @@ useEffect(() => {
     sessionPhase === "speaking"
   ) {
     (async () => {
-      await mediaPipeAnalyzer.initialize(localVideoRef.current)
-      mediaPipeAnalyzer.startAnalysis()
+      if (localVideoRef.current) {
+        await mediaPipeAnalyzer.initialize(localVideoRef.current)
+        mediaPipeAnalyzer.startAnalysis()
+      }
     })()
   }
 }, [localVideoRef.current, room?.current_speaker, sessionPhase, currentUser.id])
@@ -903,9 +923,14 @@ useEffect(() => {
         console.log("📺 Assigning stream to video element for peer:", peerId)
         videoElement.srcObject = stream
         
+        // ✅ AUDIO FIX: Ensure audio is enabled for remote streams
+        videoElement.muted = false
+        videoElement.volume = 1.0
+        
         // Ensure video plays
         videoElement.play().then(() => {
           console.log("✅ Video playing successfully for peer:", peerId)
+          console.log("🔊 Audio enabled for peer:", peerId, "- Audio tracks:", stream.getAudioTracks().length)
         }).catch(error => {
           console.error("❌ Error playing video for peer:", peerId, error)
           // Try again after a delay
@@ -929,7 +954,7 @@ useEffect(() => {
           
           for (const video of allVideos) {
             if (video === localVideoRef.current) continue
-            if (!video.srcObject || video.srcObject.id === 'placeholder') {
+            if (!video.srcObject) {
               foundElement = video as HTMLVideoElement
               break
             }
@@ -939,6 +964,9 @@ useEffect(() => {
             console.log(`📺 Retry ${retryCount + 1} successful for peer:`, peerId)
             foundElement.setAttribute('data-peer-id', peerId)
             foundElement.srcObject = stream
+            // ✅ AUDIO FIX: Ensure audio is enabled for remote streams  
+            foundElement.muted = false
+            foundElement.volume = 1.0
             remoteVideosRef.current.set(peerId, foundElement)
             foundElement.play().catch(error => console.error("❌ Retry play error:", error))
           } else if (retryCount < maxRetries) {
@@ -988,6 +1016,11 @@ useEffect(() => {
     const newState = !micEnabled
     setMicEnabled(newState)
     webrtcService.toggleAudio(newState)
+    
+    if (newState) {
+      enableAudioForAllVideos()
+    }
+    
     if (socket && room) {
       socket.send(JSON.stringify({
         type: "toggle_mic",
@@ -995,6 +1028,20 @@ useEffect(() => {
         mic_enabled: newState
       }))
     }
+  }
+
+  // ✅ AUDIO FIX: Function to enable audio for all remote videos
+  const enableAudioForAllVideos = () => {
+    console.log("🔊 Enabling audio for all remote videos...")
+    const allVideos = document.querySelectorAll('video[data-peer-id]')
+    allVideos.forEach((video) => {
+      const videoElement = video as HTMLVideoElement
+      if (videoElement.srcObject) {
+        videoElement.muted = false
+        videoElement.volume = 1.0
+        console.log("🔊 Audio enabled for video:", videoElement.getAttribute('data-peer-id'))
+      }
+    })
   }
 
   const startSession = () => {
@@ -1363,7 +1410,10 @@ Report ID: ${report.participant_id || 'unknown'}_${Date.now()}
                               ref={(el) => {
                                 if (el && participantId) {
                                   el.setAttribute('data-peer-id', participantId)
-                                  el.muted = true // <-- Add this to allow autoplay
+                                  // DO NOT mute remote videos - we want to hear their audio
+                                  el.muted = false
+                                  // Set volume to full for audio
+                                  el.volume = 1.0
                                   remoteVideosRef.current.set(participantId, el)
                                   const existingStream = webrtcService.getCallState().remoteStreams.get(participantId)
                                   // Only assign if not already set

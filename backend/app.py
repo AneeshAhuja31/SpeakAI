@@ -6,7 +6,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel
 from report_db import insert_report,get_stats
-import os  
+import os   
 from key_manager import APIKeyManager
 import json
 import uuid
