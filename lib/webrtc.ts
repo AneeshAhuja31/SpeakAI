@@ -23,8 +23,8 @@ class WebRTCService {
       { urls: "stun:stun1.l.google.com:19302" },
       {
       urls: "turn:relay1.expressturn.com:3480",
-      username: "000000002072354464", // <-- replace with your TURN username
-      credential: "URGF0vnaKMoQ58xdOLZj2ZY2d3M=" // <-- replace with your TURN password
+      username: "000000002072354464", 
+      credential: "URGF0vnaKMoQ58xdOLZj2ZY2d3M=" 
     }
     ],
   }

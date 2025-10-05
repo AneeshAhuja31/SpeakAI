@@ -257,6 +257,11 @@ useEffect(() => {
       })
       mediaStreamRef.current = stream
 
+      // Set the video stream to the video element
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+      }
+
       // Initialize speech recognition
       await speechRecognition.initialize()
       await speechRecognition.startRecording(stream)
@@ -832,12 +837,66 @@ if (currentStep === "speaking") {
 
           {/* Main Content Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-200px)]">
-            {/* Video Analysis Section */}
+            {/* Left Side - Video Only */}
             <div className="bg-white rounded-lg shadow-lg overflow-hidden">
               <div className="bg-gray-800 text-white p-3">
-                <h3 className="text-lg font-semibold">Video Analysis</h3>
+                <h3 className="text-lg font-semibold">Live Video</h3>
               </div>
-              <div className="p-4 h-full">
+              <div className="p-4 h-full flex items-center justify-center">
+                {/* Video Container */}
+                <div className="w-full max-w-md aspect-video bg-gray-800 rounded-lg overflow-hidden">
+                  <video 
+                    ref={videoRef}
+                    autoPlay 
+                    playsInline 
+                    muted
+                    className="w-full h-full object-cover transform scale-x-[-1]"
+                    style={{ transform: 'scaleX(-1)' }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Right Side - Analysis and Feedback */}
+            <div className="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col">
+              <div className="bg-gray-800 text-white p-3">
+                <h3 className="text-lg font-semibold">AI Analysis & Feedback</h3>
+              </div>
+              <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+                {/* WebSocket Status */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="font-medium text-blue-900 mb-2">🎤 Speech Recognition Status</h4>
+                  <div id="websocket-status" className="text-blue-800 text-sm">
+                    Initializing speech recognition...
+                  </div>
+                </div>
+
+                {/* MediaPipe Analysis Results */}
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <h4 className="font-medium text-green-900 mb-2">📹 Body Language Analysis</h4>
+                  <div id="mediapipe-feedback" className="text-green-800 text-sm min-h-[120px]">
+                    Video analysis will appear here...
+                  </div>
+                </div>
+
+                {/* Live Feedback */}
+                {liveFeedback.length > 0 && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <h4 className="font-medium text-yellow-900 mb-2">💡 Live Tips</h4>
+                    <div className="space-y-2">
+                      {liveFeedback.map((feedback, index) => (
+                        <div
+                          key={index}
+                          className="text-yellow-800 text-sm p-2 bg-yellow-100 rounded animate-fade-in"
+                        >
+                          {feedback}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* MediaPipe Analysis iframe - Hidden but functional */}
                 <iframe
                   srcDoc={`
                     <!DOCTYPE html>
@@ -847,92 +906,17 @@ if (currentStep === "speaking") {
                         <script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic/holistic.js"></script>
                         <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
                         <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
-                        <style>
-                            body {
-                                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                                margin: 0;
-                                padding: 10px;
-                                background-color: #f4f7f6;
-                                color: #333;
-                                display: flex;
-                                flex-direction: column;
-                                align-items: center;
-                                min-height: 100vh;
-                            }
-
-                            #status {
-                                margin-top: 10px;
-                                padding: 15px;
-                                border: 1px solid #a0a0a0;
-                                border-radius: 8px;
-                                background-color: #e9ecef;
-                                color: #555;
-                                font-size: 1rem;
-                                text-align: center;
-                                width: 100%;
-                                max-width: 700px;
-                                box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
-                            }
-
-                            .video-section {
-                                background-color: #ffffff;
-                                border: 1px solid #e0e0e0;
-                                border-radius: 10px;
-                                box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
-                                padding: 20px;
-                                display: flex;
-                                flex-direction: column;
-                                align-items: center;
-                                width: 100%;
-                                max-width: 680px;
-                            }
-
-                            .input_video {
-                                border: 1px solid #ddd;
-                                border-radius: 8px;
-                                margin-bottom: 15px;
-                                width: 100%;
-                                max-width: 500px;
-                                height: auto;
-                                transform: scaleX(-1); /* Mirror the video like a selfie */
-                            }
-
-                            canvas {
-                                display: none; /* Hide canvas since we're showing video directly */
-                            }
-
-                            #feedback {
-                                margin-top: 15px;
-                                font-size: 1.1rem;
-                                color: #34495e;
-                                background-color: #f8fcfc;
-                                border: 1px dashed #aed6f1;
-                                padding: 15px;
-                                border-radius: 8px;
-                                width: 100%;
-                                box-sizing: border-box;
-                                line-height: 1.6;
-                            }
-                        </style>
                     </head>
-                    <body>
-                        <p id="status">Starting analysis...</p>
-
-                        <div class="video-section">
-                            <video class="input_video" autoplay playsinline></video>
-                            <canvas class="output_canvas" width="640px" height="480px"></canvas>
-                            <div id="feedback">Real-time feedback will appear here...</div>
-                        </div>
+                    <body style="margin: 0; padding: 0;">
+                        <video class="input_video" autoplay playsinline style="display: none;"></video>
+                        <canvas class="output_canvas" width="640px" height="480px" style="display: none;"></canvas>
 
                         <script>
-                            const status = document.getElementById('status');
                             const videoElement = document.getElementsByClassName('input_video')[0];
                             const canvasElement = document.getElementsByClassName('output_canvas')[0];
                             const canvasCtx = canvasElement.getContext('2d');
-                            const feedbackEl = document.getElementById("feedback");
                             let ws;
                             let recognition;
-                            let sessionTimeoutId;
                             let sessionId;
                             let sessionStartTime;
                             
@@ -965,18 +949,38 @@ if (currentStep === "speaking") {
                                 textChunks = [];
                             }
 
+                            function updateParentStatus(message) {
+                                try {
+                                    const parentStatus = window.parent.document.getElementById('websocket-status');
+                                    if (parentStatus) {
+                                        parentStatus.innerHTML = message;
+                                    }
+                                } catch (e) {
+                                    console.log('Could not update parent status:', e);
+                                }
+                            }
+
+                            function updateParentFeedback(feedbackText) {
+                                try {
+                                    const parentFeedback = window.parent.document.getElementById('mediapipe-feedback');
+                                    if (parentFeedback) {
+                                        parentFeedback.innerHTML = feedbackText;
+                                    }
+                                } catch (e) {
+                                    console.log('Could not update parent feedback:', e);
+                                }
+                            }
+
                             function generateSessionId() {
                                 return Date.now().toString() + Math.random().toString(36).substr(2, 9);
                             }
 
-                            // ...existing code...
                             function startRecognition() {
                                 if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-                                    status.innerText = 'Speech recognition not supported. Use Chrome or Edge.';
+                                    updateParentStatus('Speech recognition not supported. Use Chrome or Edge.');
                                     return;
                                 }
 
-                                // Stop any existing recognition first
                                 if (recognition) {
                                     try {
                                         recognition.stop();
@@ -997,7 +1001,7 @@ if (currentStep === "speaking") {
 
                                 recognition.onstart = () => {
                                     console.log('Speech recognition started');
-                                    status.innerText = 'Speech recognition active. Speak naturally.';
+                                    updateParentStatus('🎤 Speech recognition active. Speak naturally.');
                                     isRestarting = false;
                                 };
 
@@ -1021,7 +1025,7 @@ if (currentStep === "speaking") {
                                             if (ws && ws.readyState === WebSocket.OPEN) {
                                                 ws.send(currentTranscript);
                                             } else {
-                                                status.innerText = 'You said: ' + currentTranscript;
+                                                updateParentStatus('📝 You said: ' + currentTranscript);
                                             }
                                         }
                                     } catch (error) {
@@ -1034,42 +1038,40 @@ if (currentStep === "speaking") {
                                     
                                     switch(event.error) {
                                         case 'not-allowed':
-                                            status.innerText = 'Microphone access denied. Please refresh and allow permissions.';
+                                            updateParentStatus('❌ Microphone access denied. Please refresh and allow permissions.');
                                             break;
                                         case 'network':
-                                            status.innerText = 'Network error. Check your connection.';
+                                            updateParentStatus('❌ Network error. Check your connection.');
                                             break;
                                         case 'no-speech':
                                             console.log('No speech detected, will restart...');
-                                            // Don't restart immediately, let onend handle it
                                             break;
                                         case 'aborted':
                                             console.log('Speech recognition aborted');
                                             return;
                                         case 'audio-capture':
-                                            status.innerText = 'Microphone not found. Please check your microphone.';
+                                            updateParentStatus('❌ Microphone not found. Please check your microphone.');
                                             break;
                                         default:
-                                            status.innerText = 'Speech recognition error: ' + event.error;
+                                            updateParentStatus('❌ Speech recognition error: ' + event.error);
                                     }
                                 };
 
                                 recognition.onend = () => {
                                     console.log('Speech recognition ended');
                                     
-                                    // Only restart if websocket is still open and we're not already restarting
                                     if (ws && ws.readyState === WebSocket.OPEN && !isRestarting) {
                                         isRestarting = true;
                                         setTimeout(() => {
                                             if (isRestarting && ws && ws.readyState === WebSocket.OPEN) {
                                                 try {
-                                                    startRecognition(); // Call the function recursively
+                                                    startRecognition();
                                                 } catch (error) {
                                                     console.log('Failed to restart recognition:', error);
                                                     isRestarting = false;
                                                 }
                                             }
-                                        }, 1000); // Longer delay to prevent rapid restarts
+                                        }, 1000);
                                     }
                                 };
 
@@ -1077,38 +1079,33 @@ if (currentStep === "speaking") {
                                     recognition.start();
                                 } catch (error) {
                                     console.error('Error starting recognition:', error);
-                                    status.innerText = 'Failed to start speech recognition. Please refresh.';
+                                    updateParentStatus('❌ Failed to start speech recognition. Please refresh.');
                                 }
                             }
-// ...existing code...
-                            // ...existing code...
+
                             async function autoStart() {
                                 sessionId = generateSessionId();
                                 sessionStartTime = Date.now();
                                 resetMediaPipeData();
                                 
-                                // Check browser support first
                                 if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-                                    status.innerText = 'Speech recognition not supported. Try Chrome or Edge.';
+                                    updateParentStatus('❌ Speech recognition not supported. Try Chrome or Edge.');
                                     camera.start();
                                     return;
                                 }
 
-                                // Check microphone permission first
                                 try {
                                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                                     stream.getTracks().forEach(track => track.stop());
                                     console.log('Microphone permission granted');
                                 } catch (error) {
-                                    status.innerText = 'Microphone access required. Please allow permissions and refresh.';
-                                    camera.start(); // Still start camera
+                                    updateParentStatus('❌ Microphone access required. Please allow permissions and refresh.');
+                                    camera.start();
                                     return;
                                 }
                                 
-                                // Start camera first
                                 camera.start();
                                 
-                                // Try WebSocket connection with timeout
                                 try {
                                     ws = new WebSocket('ws://127.0.0.1:8000/ws/audio');
                                     
@@ -1117,8 +1114,8 @@ if (currentStep === "speaking") {
                                         if (ws && ws.readyState === WebSocket.CONNECTING) {
                                             ws.close();
                                             console.warn('WebSocket connection timeout');
-                                            status.innerText = 'Backend unavailable. Continuing with video analysis only.';
-                                            startRecognition(); // Start recognition anyway
+                                            updateParentStatus('⚠️ Backend unavailable. Continuing with video analysis only.');
+                                            startRecognition();
                                         }
                                     }, 5000);
                                     
@@ -1126,7 +1123,7 @@ if (currentStep === "speaking") {
                                         clearTimeout(connectionTimeout);
                                         console.log('WebSocket connected successfully');
                                         startRecognition();
-                                        status.innerText = 'Connected! Speak naturally.';
+                                        updateParentStatus('✅ Connected! Speak naturally.');
                                     };
                                     
                                     ws.onmessage = (event) => {
@@ -1138,7 +1135,7 @@ if (currentStep === "speaking") {
                                                     timestamp: Date.now()
                                                 });
                                             }
-                                            status.innerText = event.data;
+                                            updateParentStatus('🤖 AI: ' + event.data);
                                         } catch (error) {
                                             console.error('WebSocket message error:', error);
                                         }
@@ -1147,8 +1144,8 @@ if (currentStep === "speaking") {
                                     ws.onerror = (event) => {
                                         clearTimeout(connectionTimeout);
                                         console.error('WebSocket error:', event);
-                                        status.innerText = 'Backend connection failed. Continuing with video analysis only.';
-                                        startRecognition(); // Start recognition anyway
+                                        updateParentStatus('⚠️ Backend connection failed. Continuing with video analysis only.');
+                                        startRecognition();
                                     };
 
                                     ws.onclose = (event) => {
@@ -1166,15 +1163,15 @@ if (currentStep === "speaking") {
                                     
                                 } catch (error) {
                                     console.warn('WebSocket creation failed:', error);
-                                    status.innerText = 'Backend unavailable. Continuing with video analysis only.';
-                                    startRecognition(); // Start recognition anyway
+                                    updateParentStatus('⚠️ Backend unavailable. Continuing with video analysis only.');
+                                    startRecognition();
                                 }
                             }
-// ...existing code...
+
                             window.addEventListener('message', (event) => {
                               if (event.data.action === 'getSessionData') {
                                 const sessionDuration = (Date.now() - sessionStartTime) / 1000;
-                                const frameRate = 30; // Approximate frame rate
+                                const frameRate = 30;
                                 
                                 const sessionData = {
                                   sessionDuration: sessionDuration,
@@ -1207,65 +1204,56 @@ if (currentStep === "speaking") {
                             holistic.onResults(results => {
                                 mediaPipeData.totalFrames++;
                                 
-                                // Still process the image for MediaPipe analysis but don't draw to canvas
-                                // The video element will show the camera feed directly
-
                                 let feedback = [];
-                                let goodPosture = false;
-                                let handGestures = false;
-                                let speaking = false;
 
-                                // Posture
+                                // Posture Analysis
                                 if (results.poseLandmarks) {
                                     const leftShoulder = results.poseLandmarks[11];
                                     const rightShoulder = results.poseLandmarks[12];
                                     if (leftShoulder && rightShoulder) {
                                         const shoulderTilt = Math.abs(leftShoulder.y - rightShoulder.y);
                                         if (shoulderTilt <= 0.05) {
-                                            feedback.push("✅ <strong>Good posture.</strong>");
-                                            goodPosture = true;
+                                            feedback.push("✅ <strong>Excellent posture!</strong> Keep it up.");
                                             mediaPipeData.goodPostureFrames++;
                                         } else {
-                                            feedback.push("🔴 <strong>Stand upright:</strong> Your shoulders seem tilted.");
+                                            feedback.push("� <strong>Posture tip:</strong> Try to keep your shoulders level.");
                                         }
                                     } else {
-                                        feedback.push("ℹ️ Stand further back to detect posture.");
+                                        feedback.push("📹 <strong>Position tip:</strong> Step back a bit for better posture detection.");
                                     }
                                 } else {
-                                    feedback.push("ℹ️ No pose detected for posture analysis.");
+                                    feedback.push("🔍 <strong>Detection:</strong> Checking for body position...");
                                 }
 
-                                // Hand movement
+                                // Hand Gestures
                                 const handsVisible = results.leftHandLandmarks || results.rightHandLandmarks;
                                 if (handsVisible) {
-                                    feedback.push("✅ <strong>Hands detected:</strong> Good use of gestures.");
-                                    handGestures = true;
+                                    feedback.push("👋 <strong>Great gestures!</strong> Your hands are enhancing your message.");
                                     mediaPipeData.handGesturesFrames++;
                                 } else {
-                                    feedback.push("🔴 <strong>Try to use more hand gestures</strong> for expression.");
+                                    feedback.push("🤲 <strong>Gesture tip:</strong> Use hand movements to emphasize your points.");
                                 }
 
-                                // Mouth open (indicates speaking)
+                                // Speaking Detection
                                 if (results.faceLandmarks) {
                                     const upperLip = results.faceLandmarks[13];
                                     const lowerLip = results.faceLandmarks[14];
                                     if (upperLip && lowerLip) {
                                         const mouthOpen = (lowerLip.y - upperLip.y) > 0.015;
                                         if (mouthOpen) {
-                                            feedback.push("✅ <strong>You're likely speaking.</strong>");
-                                            speaking = true;
+                                            feedback.push("🗣️ <strong>Good articulation!</strong> Keep speaking clearly.");
                                             mediaPipeData.speakingFrames++;
                                         } else {
-                                            feedback.push("🔴 <strong>Try to speak up</strong> or vary expressions if you're speaking.");
+                                            feedback.push("🎤 <strong>Volume tip:</strong> Make sure you're speaking audibly.");
                                         }
                                     } else {
-                                        feedback.push("ℹ️ No face detected for mouth analysis.");
+                                        feedback.push("👤 <strong>Face detection:</strong> Analyzing facial expressions...");
                                     }
                                 } else {
-                                    feedback.push("ℹ️ No face detected for mouth analysis.");
+                                    feedback.push("🔎 <strong>Face detection:</strong> Looking for facial cues...");
                                 }
 
-                                feedbackEl.innerHTML = feedback.join("<br>");
+                                updateParentFeedback(feedback.join("<br><br>"));
                             });
 
                             const camera = new Camera(videoElement, {
@@ -1276,13 +1264,12 @@ if (currentStep === "speaking") {
                                 height: 480
                             });
 
-                            // Auto-start after a short delay
                             setTimeout(autoStart, 1000);
                         </script>
                     </body>
                     </html>
                   `}
-                  className="w-full h-full border-0"
+                  className="w-0 h-0 border-0 opacity-0 pointer-events-none"
                   title="MediaPipe Analysis"
                 />
               </div>
