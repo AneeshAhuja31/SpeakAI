@@ -21,6 +21,11 @@ class WebRTCService {
     iceServers: [
       { urls: "stun:stun.l.google.com:19302" },
       { urls: "stun:stun1.l.google.com:19302" },
+      {
+      urls: "turn:relay1.expressturn.com:3480",
+      username: "000000002072354464", // <-- replace with your TURN username
+      credential: "URGF0vnaKMoQ58xdOLZj2ZY2d3M=" // <-- replace with your TURN password
+    }
     ],
   }
 
@@ -62,7 +67,22 @@ class WebRTCService {
 
       this.localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
       this.callState.localStream = this.localStream
-      console.log("🎥 Local stream initialized")
+      
+      // ✅ AUDIO DEBUG: Log stream details
+      console.log("🎥 Local stream initialized with tracks:")
+      console.log("📹 Video tracks:", this.localStream.getVideoTracks().map(t => ({ 
+        id: t.id, 
+        kind: t.kind, 
+        enabled: t.enabled,
+        label: t.label
+      })))
+      console.log("🔊 Audio tracks:", this.localStream.getAudioTracks().map(t => ({ 
+        id: t.id, 
+        kind: t.kind, 
+        enabled: t.enabled,
+        label: t.label
+      })))
+      
       return this.localStream
     } catch (error) {
       console.error("Error accessing media devices:", error)
@@ -77,7 +97,7 @@ class WebRTCService {
     if (this.localStream) {
       this.localStream.getTracks().forEach((track) => {
         if (this.localStream) {
-          console.log("➕ Adding track to peer connection:", track.kind)
+          console.log("➕ Adding track to peer connection:", track.kind, "enabled:", track.enabled)
           peerConnection.addTrack(track, this.localStream)
         }
       })
@@ -85,14 +105,30 @@ class WebRTCService {
     
     // Handle remote stream
     peerConnection.ontrack = (event) => {
-    console.log("🎥 ontrack fired for", peerId, event.streams)
-    if (event.streams && event.streams[0]) {
-      this.callState.remoteStreams.set(peerId, event.streams[0])
-      if (this.onRemoteStreamAdded) {
-        this.onRemoteStreamAdded(peerId, event.streams[0])
+      console.log("🎥 ontrack fired for", peerId, "with", event.streams.length, "streams")
+      console.log("🔊 Track details:", {
+        kind: event.track.kind,
+        enabled: event.track.enabled,
+        id: event.track.id,
+        label: event.track.label,
+        muted: event.track.muted,
+        readyState: event.track.readyState
+      })
+      
+      if (event.streams && event.streams[0]) {
+        const stream = event.streams[0]
+        console.log("📺 Stream tracks:", {
+          video: stream.getVideoTracks().length,
+          audio: stream.getAudioTracks().length,
+          streamId: stream.id
+        })
+        
+        this.callState.remoteStreams.set(peerId, stream)
+        if (this.onRemoteStreamAdded) {
+          this.onRemoteStreamAdded(peerId, stream)
+        }
       }
     }
-  }
 
     // Handle ICE candidates
     peerConnection.onicecandidate = (event) => {
@@ -217,17 +253,27 @@ class WebRTCService {
 
   toggleAudio(enabled: boolean): void {
     if (this.localStream) {
-      this.localStream.getAudioTracks().forEach((track) => {
+      const audioTracks = this.localStream.getAudioTracks()
+      console.log(`🔊 Toggling audio to ${enabled ? 'ON' : 'OFF'} for ${audioTracks.length} tracks`)
+      audioTracks.forEach((track) => {
         track.enabled = enabled
+        console.log(`🔊 Audio track ${track.id} enabled:`, track.enabled)
       })
+    } else {
+      console.warn("❌ No local stream available for audio toggle")
     }
   }
 
   toggleVideo(enabled: boolean): void {
     if (this.localStream) {
-      this.localStream.getVideoTracks().forEach((track) => {
+      const videoTracks = this.localStream.getVideoTracks()
+      console.log(`📹 Toggling video to ${enabled ? 'ON' : 'OFF'} for ${videoTracks.length} tracks`)
+      videoTracks.forEach((track) => {
         track.enabled = enabled
+        console.log(`📹 Video track ${track.id} enabled:`, track.enabled)
       })
+    } else {
+      console.warn("❌ No local stream available for video toggle")
     }
   }
 
