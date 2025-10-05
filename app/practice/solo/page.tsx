@@ -1288,31 +1288,6 @@ if (currentStep === "speaking") {
               </div>
             </div>
 
-            {/* Audio Analysis Section */}
-            <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-              <div className="bg-gray-800 text-white p-3">
-                <h3 className="text-lg font-semibold flex items-center">
-                  <BarChart3 className="w-5 h-5 mr-2" />
-                  Audio Analysis
-                </h3>
-              </div>
-              <div className="h-full relative">
-                <iframe
-                  src="http://localhost:8501/"
-                  className="w-full h-full border-0"
-                  title="Streamlit Audio Analysis"
-                  onError={() => {
-                    console.log("Streamlit connection failed, trying localhost...")
-                  }}
-                />
-                <div className="absolute top-4 left-4 right-4 bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
-                  <p>
-                    <strong>Audio Analysis:</strong> Real-time pitch, loudness, and tempo tracking
-                  </p>
-                  <p className="text-xs mt-1">If graphs don't appear, ensure Streamlit is running on port 8501</p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
